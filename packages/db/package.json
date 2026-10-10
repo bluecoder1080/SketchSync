@@ -1,0 +1,29 @@
+{
+  "name": "@repo/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "prisma"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:format": "prisma format"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "@repo/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "prisma": "^6.4.1",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,141 @@
+// SketchSync initial schema — Step 3: Database Foundation.
+//
+// Design notes:
+// - IDs are client-generatable UUID strings so `tempId` idempotency works
+//   without a DB round-trip and without requiring pgcrypto.
+// - `DrawingEvent.seq` is a per-room monotonic integer. Ordering + replay
+//   depend on UNIQUE(roomId, seq). The app assigns it inside a transaction.
+// - `payload` is Json (jsonb) because shapes differ per kind. Every write
+//   MUST be validated by @repo/contracts Zod schemas before INSERT.
+// - Authors are RESTRICTed from deletion so replay history never loses rows.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoomRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum DrawingKind {
+  STROKE
+  LINE
+  RECT
+  CIRCLE
+  ARROW
+  TEXT
+  ERASE
+}
+
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  ownedRooms   Room[]         @relation("RoomOwner")
+  memberships  RoomMember[]
+  drawingEvents DrawingEvent[] @relation("EventAuthor")
+  chatMessages ChatMessage[]  @relation("ChatAuthor")
+  refreshTokens RefreshToken[]
+}
+
+model Room {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner     User           @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members   RoomMember[]
+  events    DrawingEvent[]
+  chat      ChatMessage[]
+  snapshots RoomSnapshot[]
+
+  @@index([ownerId])
+}
+
+model RoomMember {
+  roomId   String
+  userId   String
+  role     RoomRole @default(EDITOR)
+  joinedAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, userId])
+  @@index([userId])
+}
+
+model DrawingEvent {
+  id        String      @id @default(uuid())
+  roomId    String
+  authorId  String
+  kind      DrawingKind
+  payload   Json
+  seq       Int
+  tempId    String
+  createdAt DateTime    @default(now())
+
+  room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  author User @relation("EventAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  // Ordering: replay is ORDER BY seq ASC. Unique prevents double-assign.
+  @@unique([roomId, seq])
+  // Idempotency: client retries with same tempId return the same row.
+  @@unique([roomId, tempId])
+  @@index([roomId, seq])
+  @@index([roomId, createdAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  roomId    String
+  authorId  String
+  body      String
+  tempId    String
+  createdAt DateTime @default(now())
+
+  room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  author User @relation("ChatAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@unique([roomId, tempId])
+  @@index([roomId, createdAt])
+}
+
+model RoomSnapshot {
+  id        String   @id @default(uuid())
+  roomId    String
+  upToSeq   Int
+  data      Json
+  createdAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, upToSeq])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

@@ -1,0 +1,24 @@
+# deps
+node_modules/
+
+# builds
+dist/
+build/
+.next/
+out/
+
+# turbo
+.turbo/
+
+# env — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# prisma
+*.db
+*.db-journal
+
+# OS / editor
+.DS_Store
+Thumbs.db
