@@ -23,6 +23,7 @@
     "@repo/contracts": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^20.17.0",
     "prisma": "^6.4.1",
     "typescript": "^5.6.3"
   }

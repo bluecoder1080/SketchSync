@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 // Singleton: Next.js / Express hot-reload would otherwise open a new pool
 // per reload and exhaust PostgreSQL connections.
-const globalForPrisma = globalThis as unknown {
+const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
